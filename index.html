@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#fcfcfb">
+<title>Températures</title>
+<style>
+  :root {
+    color-scheme: light;
+    --surface:  #fcfcfb;
+    --plane:    #f9f9f7;
+    --ink:      #0b0b0b;
+    --ink-2:    #52514e;
+    --muted:    #898781;
+    --grid:     #e1e0d9;
+    --axis:     #c3c2b7;
+    --bord:     rgba(11,11,11,.10);
+    --alerte:   #a32d2d;
+    --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
+    --s5: #e87ba4; --s6: #008300; --s7: #6250d6; --s8: #e34948;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --surface: #1a1a19; --plane: #0d0d0d;
+      --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+      --grid: #2c2c2a; --axis: #383835;
+      --bord: rgba(255,255,255,.10);
+      --alerte: #e66767;
+      --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+      --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --surface: #1a1a19; --plane: #0d0d0d;
+    --ink: #f0efec; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --axis: #383835;
+    --bord: rgba(255,255,255,.10);
+    --alerte: #e66767;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  }
+
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  body {
+    margin: 0;
+    padding: 20px 16px 40px;
+    padding-left: max(16px, env(safe-area-inset-left));
+    padding-right: max(16px, env(safe-area-inset-right));
+    background: var(--plane); color: var(--ink);
+    font: 15px/1.5 system-ui, -apple-system, "Segoe UI", sans-serif;
+    -webkit-text-size-adjust: 100%;
+  }
+  .page { max-width: 1040px; margin: 0 auto; }
+
+  header { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+  h1 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
+  .maj { color: var(--muted); font-size: 13px; }
+  .spacer { flex: 1 1 auto; }
+
+  button {
+    font: inherit; font-size: 13px; color: var(--ink-2);
+    background: var(--surface); border: 1px solid var(--bord);
+    border-radius: 8px; padding: 7px 12px; cursor: pointer; min-height: 36px;
+  }
+  button:hover { background: var(--grid); }
+  button[aria-pressed="true"] { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+
+  .tuiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; margin-bottom: 18px; }
+  .tuile { background: var(--surface); border: 1px solid var(--bord); border-radius: 12px; padding: 13px 15px; }
+  .tuile .zone { display: flex; align-items: center; gap: 7px; font-size: 13px; color: var(--ink-2); margin-bottom: 7px; }
+  .pastille { width: 9px; height: 9px; border-radius: 50%; flex: none; }
+  .tuile .valeurs { display: flex; gap: 14px; align-items: baseline; flex-wrap: wrap; }
+  .tuile .gros { font-size: 26px; font-weight: 600; letter-spacing: -.02em; }
+  .tuile .petit { font-size: 15px; color: var(--ink-2); }
+  .tuile .meta { margin-top: 6px; font-size: 12px; color: var(--muted); }
+  .tuile.perime { border-color: var(--alerte); }
+  .tuile.perime .meta { color: var(--alerte); }
+
+  .filtres { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; margin-bottom: 14px; }
+  .groupe { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
+  .groupe > span { font-size: 12px; color: var(--muted); margin-right: 2px; }
+
+  .carte { background: var(--surface); border: 1px solid var(--bord); border-radius: 12px; padding: 14px 14px 6px; margin-bottom: 12px; }
+  .carte h2 { font-size: 13px; font-weight: 600; color: var(--ink-2); margin: 0 0 2px; }
+  svg { display: block; width: 100%; height: auto; touch-action: pan-y; }
+
+  .legende { display: flex; gap: 14px; flex-wrap: wrap; font-size: 13px; color: var(--ink-2); margin: 2px 0 12px; }
+  .legende span { display: inline-flex; align-items: center; gap: 7px; }
+
+  table { border-collapse: collapse; width: 100%; font-size: 13px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: right; padding: 6px 9px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+  th:first-child, td:first-child { text-align: left; }
+  th { color: var(--muted); font-weight: 500; position: sticky; top: 0; background: var(--surface); }
+  .tableWrap { max-height: 360px; overflow: auto; -webkit-overflow-scrolling: touch; }
+
+  .etat { padding: 32px 16px; text-align: center; color: var(--muted); font-size: 14px; line-height: 1.7; }
+  .etat code { font-family: ui-monospace, Menlo, Consolas, monospace; font-size: 13px;
+               background: var(--grid); padding: 1px 5px; border-radius: 4px; }
+  .etat.erreur { color: var(--alerte); }
+
+  .infobulle {
+    position: fixed; z-index: 10; pointer-events: none; opacity: 0;
+    background: var(--surface); color: var(--ink);
+    border: 1px solid var(--bord); border-radius: 9px;
+    padding: 8px 11px; font-size: 12.5px; line-height: 1.45;
+    box-shadow: 0 4px 16px rgba(0,0,0,.16); transition: opacity .1s;
+  }
+  .infobulle b { font-weight: 600; }
+  .infobulle .l { display: flex; align-items: center; gap: 10px; justify-content: space-between; }
+  .infobulle .l em { font-style: normal; color: var(--ink-2); display: inline-flex; align-items: center; gap: 6px; }
+
+  @media (max-width: 560px) {
+    body { padding-top: 14px; }
+    h1 { font-size: 17px; }
+    .tuiles { grid-template-columns: repeat(auto-fit, minmax(135px, 1fr)); gap: 8px; }
+    .tuile { padding: 11px 12px; }
+    .tuile .gros { font-size: 22px; }
+    .carte { padding: 12px 10px 4px; }
+    .filtres { gap: 10px; }
+    button { padding: 7px 10px; }
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <header>
+    <h1>Températures</h1>
+    <span class="maj" id="maj"></span>
+    <span class="spacer"></span>
+    <button id="theme" title="Basculer clair / sombre" aria-label="Basculer le thème">Thème</button>
+  </header>
+
+  <div id="etat" class="etat">Chargement des relevés…</div>
+
+  <div id="contenu" hidden>
+    <div class="tuiles" id="tuiles"></div>
+
+    <div class="filtres">
+      <div class="groupe" id="periodes"><span>Période</span></div>
+      <div class="groupe" id="zones"><span>Zones</span></div>
+      <span class="spacer"></span>
+      <button id="basculeTable" aria-pressed="false">Tableau</button>
+    </div>
+
+    <div class="legende" id="legende"></div>
+
+    <div class="carte">
+      <h2>Température (°C)</h2>
+      <svg id="svgT" role="img" aria-label="Évolution de la température"></svg>
+    </div>
+
+    <div class="carte">
+      <h2>Humidité relative (%)</h2>
+      <svg id="svgH" role="img" aria-label="Évolution de l'humidité"></svg>
+    </div>
+
+    <div class="carte" id="carteTable" hidden>
+      <h2>Données</h2>
+      <div class="tableWrap"><table id="table"></table></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="infobulle" id="infobulle"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  // =================================================================
+  //  RÉGLAGES
+  //
+  //  Un objet par ESP32. "dossier" doit correspondre exactement à la
+  //  constante ZONE du croquis Arduino ; "nom" est le libellé affiché
+  //  et peut porter accents et espaces.
+  // =================================================================
+
+  var ZONES = [
+    { dossier: "bureau",  nom: "Bureau" },
+    { dossier: "atelier", nom: "Atelier" },
+    { dossier: "stock",   nom: "Stock" }
+  ];
+
+  // Chemin des données, relatif à cette page. Les deux vivant dans le même
+  // dépôt, la requête reste sur la même origine : aucune question de CORS.
+  var RACINE = "donnees";
+
+  // Rafraîchissement automatique, en minutes. 0 pour le désactiver.
+  var RAFRAICHIR_MINUTES = 10;
+
+  // Au-delà de ce silence, une zone est signalée comme muette.
+  var SILENCE_ALERTE_HEURES = 3;
+
+  // =================================================================
+
+  var SERIES = ["--s1","--s2","--s3","--s4","--s5","--s6","--s7","--s8"];
+  var PERIODES = [
+    { cle: "24h", nom: "24 h",     jours: 1 },
+    { cle: "7j",  nom: "7 jours",  jours: 7 },
+    { cle: "30j", nom: "30 jours", jours: 30 },
+    { cle: "90j", nom: "90 jours", jours: 90 }
+  ];
+
+  var etat = { periode: "7j", actives: [], table: false, chargement: false };
+  var dernierToucher = 0;
+  var cache = {};
+  var couleur = {}, ordreZones = [];
+
+  var elEtat = document.getElementById("etat");
+  var elContenu = document.getElementById("contenu");
+
+  ZONES.forEach(function (z, i) {
+    ordreZones.push(z.nom);
+    couleur[z.nom] = "var(" + SERIES[i % SERIES.length] + ")";
+  });
+  etat.actives = ordreZones.slice();
+
+  // ---------------------------------------------------------- Lecture
+
+  function nomJour(d) {
+    return d.getFullYear() + "-"
+         + String(d.getMonth() + 1).padStart(2, "0") + "-"
+         + String(d.getDate()).padStart(2, "0");
+  }
+
+  // Les fichiers sont nommés d'après la date locale de l'ESP32, qui partage
+  // le fuseau du lecteur : on recompose donc les noms côté navigateur.
+  function joursDeLaPeriode(jours) {
+    var liste = [], d = new Date();
+    for (var i = 0; i < jours; i++) {
+      liste.push(nomJour(d));
+      d.setDate(d.getDate() - 1);
+    }
+    return liste;
+  }
+
+  function analyserCsv(texte, nomZone) {
+    var points = [];
+    texte.split("\n").forEach(function (ligne) {
+      var c = ligne.split(",");
+      if (c.length < 3) return;
+      var t = parseInt(c[0], 10);          // horodatage Unix en secondes
+      var temp = parseFloat(c[1]);
+      var hum = parseFloat(c[2]);
+      if (!isFinite(t) || !isFinite(temp)) return;   // ignore l'en-tête
+      points.push({ t: t * 1000, zone: nomZone, temp: temp,
+                    hum: isFinite(hum) ? hum : null });
+    });
+    return points;
+  }
+
+  function chargerUnJour(zone, jour, cacheBuster) {
+    var url = RACINE + "/" + zone.dossier + "/" + jour + ".csv?v=" + cacheBuster;
+    return fetch(url, { cache: "no-store" }).then(function (r) {
+      // Un 404 est le cas normal d'une journée sans relevé : capteur éteint,
+      // panne de courant, ou simplement avant son installation.
+      if (!r.ok) return [];
+      return r.text().then(function (txt) { return analyserCsv(txt, zone.nom); });
+    }).catch(function () { return []; });
+  }
+
+  function charger(periodeCle) {
+    var p = PERIODES.filter(function (x) { return x.cle === periodeCle; })[0];
+    var jours = joursDeLaPeriode(p.jours);
+    var buster = Math.floor(Date.now() / 60000);   // une minute de granularité
+
+    var travaux = [];
+    ZONES.forEach(function (z) {
+      jours.forEach(function (j) { travaux.push(chargerUnJour(z, j, buster)); });
+    });
+
+    return Promise.all(travaux).then(function (lots) {
+      var points = [];
+      lots.forEach(function (lot) {
+        lot.forEach(function (pt) { points.push(pt); });
+      });
+      points.sort(function (a, b) { return a.t - b.t; });
+
+      var paquet = { points: points, instant: Date.now() };
+      cache[periodeCle] = paquet;
+      return paquet;
+    });
+  }
+
+  function rafraichir(forcer) {
+    if (etat.chargement) return;
+    etat.chargement = true;
+    if (forcer) cache = {};
+
+    var promesse = (!forcer && cache[etat.periode])
+      ? Promise.resolve(cache[etat.periode])
+      : charger(etat.periode);
+
+    promesse.then(function (paquet) {
+      etat.chargement = false;
+
+      if (!paquet.points.length) {
+        montrerEtat(
+          "Aucune mesure trouvée sur cette période.<br><br>"
+          + "Vérifie que les fichiers existent dans le dépôt, au chemin "
+          + "<code>" + RACINE + "/&lt;zone&gt;/AAAA-MM-JJ.csv</code>, et que "
+          + "les noms de dossier de la liste <code>ZONES</code> en haut de "
+          + "cette page correspondent à la constante <code>ZONE</code> de "
+          + "chaque croquis.", true);
+        return;
+      }
+
+      elEtat.hidden = true;
+      elContenu.hidden = false;
+      if (!document.getElementById("periodes").querySelector("button")) {
+        construireCommandes();
+      }
+      rendu(paquet);
+    }).catch(function (err) {
+      etat.chargement = false;
+      montrerEtat("Lecture impossible.<br>" + err.message, true);
+    });
+  }
+
+  function montrerEtat(html, erreur) {
+    elEtat.innerHTML = html;
+    elEtat.className = "etat" + (erreur ? " erreur" : "");
+    elEtat.hidden = false;
+    if (erreur) elContenu.hidden = true;
+  }
+
+  // ---------------------------------------------------------- Commandes
+
+  function construireCommandes() {
+    var elPeriodes = document.getElementById("periodes");
+    PERIODES.forEach(function (p) {
+      var b = document.createElement("button");
+      b.textContent = p.nom;
+      b.setAttribute("aria-pressed", p.cle === etat.periode);
+      b.onclick = function () {
+        etat.periode = p.cle;
+        [].forEach.call(elPeriodes.querySelectorAll("button"), function (x) {
+          x.setAttribute("aria-pressed", x === b);
+        });
+        rafraichir(false);
+      };
+      elPeriodes.appendChild(b);
+    });
+
+    var elZones = document.getElementById("zones");
+    if (ordreZones.length > 1) {
+      ordreZones.forEach(function (z) {
+        var b = document.createElement("button");
+        b.innerHTML = pastille(z) + " " + echappe(z);
+        b.setAttribute("aria-pressed", "true");
+        b.onclick = function () {
+          var i = etat.actives.indexOf(z);
+          if (i >= 0 && etat.actives.length > 1) etat.actives.splice(i, 1);
+          else if (i < 0) etat.actives.push(z);
+          b.setAttribute("aria-pressed", etat.actives.indexOf(z) >= 0);
+          rendu(cache[etat.periode]);
+        };
+        elZones.appendChild(b);
+      });
+    } else {
+      elZones.hidden = true;
+    }
+
+    var btnTable = document.getElementById("basculeTable");
+    btnTable.onclick = function () {
+      etat.table = !etat.table;
+      btnTable.setAttribute("aria-pressed", etat.table);
+      document.getElementById("carteTable").hidden = !etat.table;
+      if (etat.table) rendu(cache[etat.periode]);
+    };
+  }
+
+  document.getElementById("theme").onclick = function () {
+    var sombreOS = window.matchMedia("(prefers-color-scheme: dark)").matches;
+    var actuel = document.documentElement.getAttribute("data-theme")
+              || (sombreOS ? "dark" : "light");
+    document.documentElement.setAttribute("data-theme", actuel === "dark" ? "light" : "dark");
+    if (cache[etat.periode]) rendu(cache[etat.periode]);
+  };
+
+  // ---------------------------------------------------------- Rendu
+
+  function rendu(paquet) {
+    if (!paquet) return;
+    var visibles = paquet.points.filter(function (p) {
+      return etat.actives.indexOf(p.zone) >= 0;
+    });
+
+    var series = etat.actives.map(function (z) {
+      return { zone: z, pts: visibles.filter(function (p) { return p.zone === z; }) };
+    }).filter(function (s) { return s.pts.length > 0; });
+
+    document.getElementById("maj").textContent =
+      "relevé à " + new Date(paquet.instant).toLocaleTimeString("fr-FR",
+        { hour: "2-digit", minute: "2-digit" });
+
+    tuiles(paquet);
+    legende();
+    panneau("svgT", series, "temp", "°C", 1, false);
+    panneau("svgH", series, "hum", "%", 0, true);
+    if (etat.table) tableau(visibles);
+  }
+
+  function tuiles(paquet) {
+    var hote = document.getElementById("tuiles");
+    hote.innerHTML = "";
+
+    ordreZones.forEach(function (z) {
+      var pts = paquet.points.filter(function (p) { return p.zone === z; });
+      var el = document.createElement("div");
+      el.className = "tuile";
+
+      if (!pts.length) {
+        el.classList.add("perime");
+        el.innerHTML = '<div class="zone">' + pastille(z) + echappe(z) + '</div>'
+          + '<div class="valeurs"><span class="gros">—</span></div>'
+          + '<div class="meta">aucune mesure sur la période</div>';
+        hote.appendChild(el);
+        return;
+      }
+
+      var d = pts[pts.length - 1];
+      var ageH = (Date.now() - d.t) / 3600e3;
+      if (ageH > SILENCE_ALERTE_HEURES) el.classList.add("perime");
+
+      el.innerHTML =
+        '<div class="zone">' + pastille(z) + echappe(z) + '</div>'
+        + '<div class="valeurs"><span class="gros">' + d.temp.toFixed(1) + ' °C</span>'
+        + (d.hum != null ? '<span class="petit">' + d.hum.toFixed(0) + ' %</span>' : '')
+        + '</div>'
+        + '<div class="meta">' + age(d.t)
+        + (ageH > SILENCE_ALERTE_HEURES ? ' · silencieux' : '') + '</div>';
+      hote.appendChild(el);
+    });
+  }
+
+  function legende() {
+    var el = document.getElementById("legende");
+    if (etat.actives.length < 2) { el.innerHTML = ""; return; }
+    el.innerHTML = etat.actives.map(function (z) {
+      return '<span>' + pastille(z) + echappe(z) + '</span>';
+    }).join("");
+  }
+
+  // Un panneau = une mesure, une échelle. Jamais deux axes verticaux dans un
+  // même cadre : cela fabrique des corrélations qui n'existent pas.
+  function panneau(id, series, champ, unite, decimales, borne0a100) {
+    var svg = document.getElementById(id);
+    var L = svg.clientWidth || 900;
+    var etroit = L < 520;
+    var H = etroit ? 210 : 260;
+
+    // Sur téléphone, pas de place pour les étiquettes de fin de courbe :
+    // la légende et les tuiles portent déjà l'identité des séries.
+    var m = { h: 14, d: etroit ? 14 : 92, b: 32, g: etroit ? 36 : 46 };
+    var l = L - m.g - m.d, haut = H - m.h - m.b;
+
+    svg.setAttribute("viewBox", "0 0 " + L + " " + H);
+    while (svg.firstChild) svg.removeChild(svg.firstChild);
+
+    var utiles = series.map(function (s) {
+      return { zone: s.zone, pts: s.pts.filter(function (p) {
+        return p[champ] != null && isFinite(p[champ]); }) };
+    }).filter(function (s) { return s.pts.length > 0; });
+
+    if (!utiles.length || l < 40) {
+      texte(svg, L / 2, H / 2, "Pas de mesure", "var(--muted)", 12, "middle");
+      return;
+    }
+
+    var tous = [];
+    utiles.forEach(function (s) { s.pts.forEach(function (p) { tous.push(p); }); });
+
+    var tMin = Math.min.apply(null, tous.map(function (p) { return p.t; }));
+    var tMax = Math.max.apply(null, tous.map(function (p) { return p.t; }));
+    if (tMax === tMin) tMax = tMin + 3600e3;
+
+    var vals = tous.map(function (p) { return p[champ]; });
+    var vMin, vMax;
+    if (borne0a100) { vMin = 0; vMax = 100; }
+    else {
+      vMin = Math.min.apply(null, vals); vMax = Math.max.apply(null, vals);
+      var marge = (vMax - vMin) * 0.12 || 1;
+      vMin -= marge; vMax += marge;
+    }
+
+    var x = function (t) { return m.g + (t - tMin) / (tMax - tMin) * l; };
+    var y = function (v) { return m.h + haut - (v - vMin) / (vMax - vMin) * haut; };
+
+    graduations(vMin, vMax, etroit ? 4 : 5).forEach(function (v) {
+      ligne(svg, m.g, y(v), m.g + l, y(v), "var(--grid)", 1);
+      texte(svg, m.g - 7, y(v) + 4, v.toFixed(decimales), "var(--muted)", 11, "end");
+    });
+
+    ligne(svg, m.g, m.h + haut, m.g + l, m.h + haut, "var(--axis)", 1);
+    ticksTemps(tMin, tMax, Math.max(2, Math.floor(l / (etroit ? 62 : 110))))
+      .forEach(function (t) {
+        texte(svg, x(t), H - 11, etiquetteTemps(t, tMax - tMin), "var(--muted)", 11, "middle");
+      });
+
+    utiles.forEach(function (s) {
+      var rang = (ordreZones.indexOf(s.zone) % SERIES.length) + 1;
+
+      // La courbe est rompue sur les interruptions : relier deux points
+      // séparés d'une journée dessinerait une ligne droite qui se lirait
+      // comme une température stable, alors que le capteur était muet.
+      var seuil = seuilRupture(s.pts);
+      var d = "", precedent = null;
+      s.pts.forEach(function (p) {
+        var commande = (precedent === null || p.t - precedent > seuil) ? "M" : "L";
+        d += commande + x(p.t).toFixed(1) + " " + y(p[champ]).toFixed(1) + " ";
+        precedent = p.t;
+      });
+
+      svg.appendChild(cree("path", { d: d, fill: "none", stroke: couleur[s.zone],
+        "stroke-width": 2, "stroke-linejoin": "round", "stroke-linecap": "round",
+        "data-slot": rang }));
+
+      // Points peu nombreux : chaque relevé est marqué, sinon la courbe
+      // laisse croire à une mesure continue.
+      if (s.pts.length <= 60) {
+        s.pts.forEach(function (p) {
+          svg.appendChild(cree("circle", { cx: x(p.t), cy: y(p[champ]), r: 2.6,
+            fill: couleur[s.zone], "data-slot": rang }));
+        });
+      }
+    });
+
+    if (!etroit) {
+      var etiq = utiles.map(function (s) {
+        var d = s.pts[s.pts.length - 1];
+        return { zone: s.zone, v: d[champ], y: y(d[champ]) };
+      }).sort(function (a, b) { return a.y - b.y; });
+      for (var i = 1; i < etiq.length; i++) {
+        if (etiq[i].y - etiq[i - 1].y < 15) etiq[i].y = etiq[i - 1].y + 15;
+      }
+      etiq.forEach(function (e) {
+        texte(svg, m.g + l + 7, Math.min(e.y + 4, H - m.b),
+              e.zone + " " + e.v.toFixed(decimales) + " " + unite,
+              couleur[e.zone], 11.5, "start");
+      });
+    }
+
+    var curseur = ligne(svg, 0, m.h, 0, m.h + haut, "var(--axis)", 1);
+    curseur.style.opacity = 0;
+    var pastilles = utiles.map(function (s) {
+      var c = cree("circle", { r: 4.5, fill: couleur[s.zone],
+        stroke: "var(--surface)", "stroke-width": 2 });
+      c.style.opacity = 0; svg.appendChild(c); return c;
+    });
+
+    svg.appendChild(cree("rect", { x: m.g, y: m.h, width: l, height: haut,
+                                   fill: "transparent" }));
+    var bulle = document.getElementById("infobulle");
+
+    function bouge(ev) {
+      var r = svg.getBoundingClientRect();
+      var px = (ev.clientX - r.left) * (L / r.width);
+      var t = tMin + (px - m.g) / l * (tMax - tMin);
+
+      curseur.setAttribute("x1", x(t)); curseur.setAttribute("x2", x(t));
+      curseur.style.opacity = 1;
+
+      var html = "<b>" + horodate(t) + "</b>";
+      utiles.forEach(function (s, i) {
+        var p = plusProche(s.pts, t);
+        pastilles[i].setAttribute("cx", x(p.t));
+        pastilles[i].setAttribute("cy", y(p[champ]));
+        pastilles[i].style.opacity = 1;
+        html += '<div class="l"><em>' + pastille(s.zone) + echappe(s.zone)
+             + '</em><span>' + p[champ].toFixed(decimales) + " " + unite + "</span></div>";
+      });
+
+      bulle.innerHTML = html;
+      bulle.style.opacity = 1;
+      var bb = bulle.getBoundingClientRect();
+      var gauche = Math.min(ev.clientX + 14, window.innerWidth - bb.width - 8);
+      var hautBulle = ev.clientY - bb.height - 16;
+      if (hautBulle < 8) hautBulle = ev.clientY + 22;
+      bulle.style.left = Math.max(8, gauche) + "px";
+      bulle.style.top = hautBulle + "px";
+    }
+
+    function sort() {
+      clearTimeout(effacement);
+      curseur.style.opacity = 0;
+      pastilles.forEach(function (c) { c.style.opacity = 0; });
+      bulle.style.opacity = 0;
+    }
+
+    var effacement;
+    function toucher(ev) {
+      if (ev.touches.length !== 1) return;
+      dernierToucher = Date.now();
+      clearTimeout(effacement);
+      bouge(ev.touches[0]);
+    }
+
+    // Après un appui, le navigateur émet des événements souris de
+    // compatibilité qui effaceraient aussitôt l'info-bulle : on les ignore
+    // pendant un court délai suivant tout contact tactile.
+    svg.addEventListener("mousemove", function (ev) {
+      if (Date.now() - dernierToucher < 900) return;
+      clearTimeout(effacement);
+      bouge(ev);
+    });
+    svg.addEventListener("mouseleave", function () {
+      if (Date.now() - dernierToucher < 900) return;
+      sort();
+    });
+
+    svg.addEventListener("touchstart", toucher, { passive: true });
+    svg.addEventListener("touchmove", toucher, { passive: true });
+    svg.addEventListener("touchend", function () {
+      dernierToucher = Date.now();
+      clearTimeout(effacement);
+      effacement = setTimeout(sort, 3000);
+    });
+  }
+
+  function tableau(liste) {
+    var t = document.getElementById("table");
+    var rangs = liste.slice().reverse().slice(0, 500);
+    var html = "<thead><tr><th>Date</th><th>Zone</th><th>Temp.</th><th>Hum.</th>"
+             + "</tr></thead><tbody>";
+    rangs.forEach(function (p) {
+      html += "<tr><td>" + horodate(p.t) + "</td><td>" + echappe(p.zone) + "</td><td>"
+           + p.temp.toFixed(1) + " °C</td><td>"
+           + (p.hum != null ? p.hum.toFixed(0) + " %" : "—") + "</td></tr>";
+    });
+    t.innerHTML = html + "</tbody>";
+  }
+
+  // ---------------------------------------------------------- Utilitaires
+
+  function cree(nom, attrs) {
+    var el = document.createElementNS("http://www.w3.org/2000/svg", nom);
+    for (var k in attrs) el.setAttribute(k, attrs[k]);
+    return el;
+  }
+  function ligne(svg, x1, y1, x2, y2, c, w) {
+    var el = cree("line", { x1: x1, y1: y1, x2: x2, y2: y2, stroke: c, "stroke-width": w });
+    svg.appendChild(el); return el;
+  }
+  function texte(svg, x, y, s, c, taille, ancre) {
+    var el = cree("text", { x: x, y: y, fill: c, "font-size": taille,
+      "text-anchor": ancre, "font-family": "system-ui, sans-serif" });
+    el.textContent = s; svg.appendChild(el); return el;
+  }
+  // data-slot fige l'identité visuelle sur la zone, pas sur son rang dans le
+  // filtre : masquer une zone ne doit pas repeindre les autres.
+  function pastille(zone) {
+    return '<span class="pastille" data-slot="'
+         + ((ordreZones.indexOf(zone) % SERIES.length) + 1)
+         + '" style="background:' + (couleur[zone] || "var(--muted)") + '"></span>';
+  }
+  function echappe(s) {
+    return String(s).replace(/[&<>"]/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c];
+    });
+  }
+  // Seuil au-delà duquel deux relevés ne sont plus reliés : deux fois et
+  // demie l'écart médian, ce qui s'adapte à la cadence réelle du capteur
+  // sans supposer qu'elle est horaire.
+  function seuilRupture(pts) {
+    if (pts.length < 3) return Infinity;
+    var ecarts = [];
+    for (var i = 1; i < pts.length; i++) ecarts.push(pts[i].t - pts[i - 1].t);
+    ecarts.sort(function (a, b) { return a - b; });
+    var median = ecarts[Math.floor(ecarts.length / 2)];
+    return Math.max(median * 2.5, 60000);
+  }
+
+  function graduations(min, max, cible) {
+    var brut = (max - min) / cible;
+    var mag = Math.pow(10, Math.floor(Math.log(brut) / Math.LN10));
+    var pas = [1, 2, 2.5, 5, 10].map(function (f) { return f * mag; })
+      .filter(function (p) { return p >= brut; })[0] || 10 * mag;
+    var out = [], v = Math.ceil(min / pas) * pas;
+    for (; v <= max + 1e-9; v += pas) out.push(Math.round(v * 1e6) / 1e6);
+    return out;
+  }
+  // Paliers resserrés : un trou entre deux valeurs ferait sauter le calcul au
+  // pas supérieur, et l'axe n'afficherait plus qu'une ou deux dates.
+  var PAS_TEMPS = [15, 30, 60, 120, 180, 360, 720, 1440, 2880, 4320, 7200,
+                   10080, 14400, 20160, 43200].map(function (mn) { return mn * 60e3; });
+
+  function ticksTemps(min, max, n) {
+    var vise = (max - min) / n;
+    var pas = PAS_TEMPS.filter(function (p) { return p >= vise; })[0]
+           || Math.ceil(vise / (10080 * 60e3)) * 10080 * 60e3;
+    var out = [], d;
+
+    if (pas >= 86400e3) {
+      d = new Date(min); d.setHours(0, 0, 0, 0);     // minuit local, pas l'epoch
+      var jours = Math.round(pas / 86400e3);
+      for (var t = d.getTime(); t <= max; ) {
+        if (t >= min) out.push(t);
+        d = new Date(t); d.setDate(d.getDate() + jours); t = d.getTime();
+      }
+    } else {
+      for (var u = Math.ceil(min / pas) * pas; u <= max; u += pas) out.push(u);
+    }
+    return out;
+  }
+  function etiquetteTemps(t, etendue) {
+    var d = new Date(t);
+    if (etendue <= 36 * 3600e3)
+      return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    if (etendue <= 4 * 86400e3 && (d.getHours() || d.getMinutes()))
+      return d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return d.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit" });
+  }
+  function horodate(t) {
+    return new Date(t).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit",
+      hour: "2-digit", minute: "2-digit" });
+  }
+  function age(t) {
+    var mn = Math.round((Date.now() - t) / 60000);
+    if (mn < 2) return "à l'instant";
+    if (mn < 60) return "il y a " + mn + " min";
+    var h = Math.floor(mn / 60);
+    if (h < 24) return "il y a " + h + " h";
+    return "il y a " + Math.floor(h / 24) + " j";
+  }
+  function plusProche(pts, t) {
+    var lo = 0, hi = pts.length - 1;
+    while (lo < hi) {
+      var mid = (lo + hi) >> 1;
+      if (pts[mid].t < t) lo = mid + 1; else hi = mid;
+    }
+    var a = pts[Math.max(0, lo - 1)], b = pts[lo];
+    return Math.abs(a.t - t) <= Math.abs(b.t - t) ? a : b;
+  }
+
+  // ---------------------------------------------------------- Démarrage
+
+  rafraichir(false);
+  if (RAFRAICHIR_MINUTES > 0) {
+    setInterval(function () { rafraichir(true); }, RAFRAICHIR_MINUTES * 60000);
+  }
+
+  var minuteur;
+  window.addEventListener("resize", function () {
+    clearTimeout(minuteur);
+    minuteur = setTimeout(function () { rendu(cache[etat.periode]); }, 150);
+  });
+  window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
+    rendu(cache[etat.periode]);
+  });
+  document.addEventListener("visibilitychange", function () {
+    if (!document.hidden && cache[etat.periode]
+        && Date.now() - cache[etat.periode].instant > 5 * 60000) {
+      rafraichir(true);
+    }
+  });
+})();
+</script>
+</body>
+</html>
