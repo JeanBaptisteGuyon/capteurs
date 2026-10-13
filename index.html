@@ -5,6 +5,10 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#fcfcfb">
 <title>Températures</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icone-192.png" sizes="192x192">
+<link rel="apple-touch-icon" href="icone-192.png">
+<meta name="mobile-web-app-capable" content="yes">
 <style>
   :root {
     color-scheme: light;
@@ -59,6 +63,7 @@
   h1 { font-size: 19px; font-weight: 600; margin: 0; letter-spacing: -.01em; }
   .maj { color: var(--muted); font-size: 13px; }
   .spacer { flex: 1 1 auto; }
+  .actions { display: flex; gap: 6px; flex: none; }
 
   button {
     font: inherit; font-size: 13px; color: var(--ink-2);
@@ -364,8 +369,11 @@
     <h1>Températures</h1>
     <span class="maj" id="maj"></span>
     <span class="spacer"></span>
-    <button id="skin" title="Changer de style d'affichage">Style</button>
-    <button id="theme" title="Basculer clair / sombre" aria-label="Basculer le thème">Thème</button>
+    <div class="actions">
+      <button id="installer" hidden>Installer</button>
+      <button id="skin" title="Changer de style d'affichage">Style</button>
+      <button id="theme" title="Basculer clair / sombre" aria-label="Basculer le thème">Thème</button>
+    </div>
   </header>
 
   <div id="etat" class="etat">Chargement des relevés…</div>
@@ -415,10 +423,9 @@
   // =================================================================
 
   var ZONES = [
-    { dossier: "bureau_ensam",  nom: "Bureau ENSAM" },
-    { dossier: "fablab_ensam", nom: "FabLab" },
-    { dossier: "chambre",   nom: "Chambre" },
-    { dossier: "salon",   nom: "Salon" }
+    { dossier: "bureau",  nom: "Bureau" },
+    { dossier: "atelier", nom: "Atelier" },
+    { dossier: "stock",   nom: "Stock" }
   ];
 
   // Chemin des données, relatif à cette page. Les deux vivant dans le même
@@ -987,6 +994,45 @@
   });
   window.matchMedia("(prefers-color-scheme: dark)").addEventListener("change", function () {
     rendu(cache[etat.periode]);
+  });
+
+
+  // ---------------------------------------------------- Application Android
+
+  if ("serviceWorker" in navigator) {
+    // Après le chargement : l'enregistrement du service worker entre en
+    // concurrence avec les premières requêtes de mesures, qui comptent plus.
+    window.addEventListener("load", function () {
+      navigator.serviceWorker.register("sw.js").catch(function (err) {
+        // Un echec n'empeche rien : la page fonctionne sans cache hors ligne.
+        console.warn("Service worker non enregistre :", err.message);
+      });
+    });
+  }
+
+  // Android propose l'installation lui-même, mais discrètement et pas sur
+  // tous les appareils. Ce bouton rend l'offre visible quand elle existe.
+  var invite = null;
+  var btnInstaller = document.getElementById("installer");
+
+  window.addEventListener("beforeinstallprompt", function (ev) {
+    ev.preventDefault();
+    invite = ev;
+    btnInstaller.hidden = false;
+  });
+
+  btnInstaller.onclick = function () {
+    if (!invite) return;
+    invite.prompt();
+    invite.userChoice.then(function () {
+      invite = null;
+      btnInstaller.hidden = true;
+    });
+  };
+
+  window.addEventListener("appinstalled", function () {
+    invite = null;
+    btnInstaller.hidden = true;
   });
 
   // ---------------------------------------------------------- Habillages
