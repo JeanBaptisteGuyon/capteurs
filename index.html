@@ -436,8 +436,12 @@ var ZONES = [
   // Rafraîchissement automatique, en minutes. 0 pour le désactiver.
   var RAFRAICHIR_MINUTES = 10;
 
+  // Intervalle attendu entre deux relevés, en minutes. À tenir égal à
+  // PERIODE_MINUTES du croquis Arduino.
+  var INTERVALLE_MINUTES = 90;
+
   // Au-delà de ce silence, une zone est signalée comme muette.
-  var SILENCE_ALERTE_HEURES = 3;
+  var SILENCE_ALERTE_HEURES = 4;
 
   // =================================================================
 
@@ -911,12 +915,13 @@ var ZONES = [
   // demie l'écart médian, ce qui s'adapte à la cadence réelle du capteur
   // sans supposer qu'elle est horaire.
   function seuilRupture(pts) {
-    if (pts.length < 3) return Infinity;
+    var plancher = INTERVALLE_MINUTES * 60000;
+    if (pts.length < 3) return Math.max(plancher * 2.5, 60000);
     var ecarts = [];
     for (var i = 1; i < pts.length; i++) ecarts.push(pts[i].t - pts[i - 1].t);
     ecarts.sort(function (a, b) { return a - b; });
     var median = ecarts[Math.floor(ecarts.length / 2)];
-    return Math.max(median * 2.5, 60000);
+    return Math.max(plancher,median) * 2.5;
   }
 
   function graduations(min, max, cible) {
