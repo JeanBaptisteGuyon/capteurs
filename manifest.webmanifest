@@ -2,6 +2,7 @@
   "name": "Températures capteurs",
   "short_name": "Températures",
   "description": "Relevés de température et d'humidité des capteurs ESP32.",
+  "id": "Capteurs température & humidité",
   "lang": "fr",
   "dir": "ltr",
   "start_url": ".",
